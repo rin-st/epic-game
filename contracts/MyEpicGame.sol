@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// NFT contract to inherit from.
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-// Helper functions OpenZeppelin provides.
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -14,29 +12,45 @@ import "./libraries/Base64.sol";
 
 // Our contract inherits from ERC721, which is the standard NFT contract!
 contract MyEpicGame is ERC721 {
-
   struct CharacterAttributes {
     uint characterIndex;
     string name;
-    string imageURI;        
+    string imageURI;
+    string attackImageURI;
+    string eatImageURI;
+    string loseImageURI;        
     uint hp;
     uint maxHp;
     uint attackDamage;
+    uint healAmount;
+    uint criticalChance;
   }
 
-  // The tokenId is the NFTs unique identifier, it's just a number that goes
-  // 0, 1, 2, 3, etc.
+  struct ChAtt {
+    string name;
+    string imageURI;
+    string attackImageURI;
+    string eatImageURI;
+    string loseImageURI;        
+    uint hp;
+    uint attackDamage;
+    uint healAmount;
+    uint criticalChance;
+  }
+
   using Counters for Counters.Counter;
   Counters.Counter private _tokenIds;
 
-  CharacterAttributes[] defaultCharacters;
+  CharacterAttributes[] defaultChars;
 
-  // We create a mapping from the nft's tokenId => that NFTs attributes.
   mapping(uint256 => CharacterAttributes) public nftHolderAttributes;
 
   struct BigBoss {
     string name;
     string imageURI;
+    string attackImageURI;
+    string eatImageURI;
+    string loseImageURI;
     uint hp;
     uint maxHp;
     uint attackDamage;
@@ -44,23 +58,18 @@ contract MyEpicGame is ERC721 {
 
   BigBoss public bigBoss;
 
-  // A mapping from an address => the NFTs tokenId. Gives me an ez way
-  // to store the owner of the NFT and reference it later.
   mapping(address => uint256) public nftHolders;
 
-  event CharacterNFTMinted(address sender, uint256 tokenId, uint256 characterIndex);
-  event AttackComplete(uint newBossHp, uint newPlayerHp);
+  event CharacterNFTMinted(address sender, uint256 tokenId, uint256 defaultCharacterIndex);
+  event AttackComplete(uint newBossHp, uint newPlayerHp, uint characterIndex, bool isCritical);
 
   constructor(
-    string[] memory characterNames,
-    string[] memory characterImageURIs,
-    uint[] memory characterHp,
-    uint[] memory characterAttackDmg,
-    // Below, you can also see I added some special identifier symbols for our NFT.
-    // This is the name and symbol for our token, ex Ethereum and ETH. I just call mine
-    // Heroes and HERO. Remember, an NFT is just a token!
+    ChAtt[] memory characterAttrs,
     string memory bossName, // These new variables would be passed in via run.js or deploy.js.
     string memory bossImageURI,
+    string memory bossAttackImageURI,
+    string memory bossEatImageURI,
+    string memory bossLoseImageURI,
     uint bossHp,
     uint bossAttackDamage
   )
@@ -69,60 +78,60 @@ contract MyEpicGame is ERC721 {
     bigBoss = BigBoss({
       name: bossName,
       imageURI: bossImageURI,
+      attackImageURI: bossAttackImageURI,
+      eatImageURI: bossEatImageURI,
+      loseImageURI: bossLoseImageURI,
       hp: bossHp,
       maxHp: bossHp,
       attackDamage: bossAttackDamage
     });
 
     console.log("Done initializing boss %s w/ HP %s, img %s", bigBoss.name, bigBoss.hp, bigBoss.imageURI);
-    for(uint i = 0; i < characterNames.length; i += 1) {
-      defaultCharacters.push(CharacterAttributes({
+    for (uint i = 0; i < characterAttrs.length; i += 1) {
+      defaultChars.push(CharacterAttributes({
         characterIndex: i,
-        name: characterNames[i],
-        imageURI: characterImageURIs[i],
-        hp: characterHp[i],
-        maxHp: characterHp[i],
-        attackDamage: characterAttackDmg[i]
+        name: characterAttrs[i].name,
+        imageURI: characterAttrs[i].imageURI,
+        attackImageURI: characterAttrs[i].attackImageURI,
+        loseImageURI: characterAttrs[i].loseImageURI,
+        eatImageURI: characterAttrs[i].eatImageURI,
+        hp: characterAttrs[i].hp,
+        maxHp: characterAttrs[i].hp,
+        attackDamage: characterAttrs[i].attackDamage,
+        healAmount: characterAttrs[i].healAmount,
+        criticalChance: characterAttrs[i].criticalChance
       }));
 
-      CharacterAttributes memory c = defaultCharacters[i];
+      CharacterAttributes memory c = defaultChars[i];
       console.log("Done initializing %s w/ HP %s, img %s", c.name, c.hp, c.imageURI);
     }
-
-    // I increment tokenIds here so that my first NFT has an ID of 1.
-    // More on this in the lesson!
-    _tokenIds.increment();
   }
 
-  // Users would be able to hit this function and get their NFT based on the
-  // characterId they send in!
-  function mintCharacterNFT(uint _characterIndex) external {
-    // Get current tokenId (starts at 1 since we incremented in the constructor).
+  function mintCharacterNFT(uint _chIdx) external {
+    _tokenIds.increment();
+
     uint256 newItemId = _tokenIds.current();
 
     // The magical function! Assigns the tokenId to the caller's wallet address.
     _safeMint(msg.sender, newItemId);
 
-    // We map the tokenId => their character attributes. More on this in
-    // the lesson below.
     nftHolderAttributes[newItemId] = CharacterAttributes({
-      characterIndex: _characterIndex,
-      name: defaultCharacters[_characterIndex].name,
-      imageURI: defaultCharacters[_characterIndex].imageURI,
-      hp: defaultCharacters[_characterIndex].hp,
-      maxHp: defaultCharacters[_characterIndex].hp,
-      attackDamage: defaultCharacters[_characterIndex].attackDamage
+      characterIndex: newItemId,
+      name: defaultChars[_chIdx].name,
+      imageURI: defaultChars[_chIdx].imageURI,
+      attackImageURI: defaultChars[_chIdx].attackImageURI,
+      loseImageURI: defaultChars[_chIdx].loseImageURI,
+      eatImageURI: defaultChars[_chIdx].eatImageURI,
+      hp: defaultChars[_chIdx].hp,
+      maxHp: defaultChars[_chIdx].hp,
+      attackDamage: defaultChars[_chIdx].attackDamage,
+      healAmount: defaultChars[_chIdx].healAmount,
+      criticalChance: defaultChars[_chIdx].criticalChance
     });
-
-    console.log("Minted NFT w/ tokenId %s and characterIndex %s", newItemId, _characterIndex);
     
-    // Keep an easy way to see who owns what NFT.
     nftHolders[msg.sender] = newItemId;
 
-    // Increment the tokenId for the next person that uses it.
-    _tokenIds.increment();
-
-    emit CharacterNFTMinted(msg.sender, newItemId, _characterIndex);
+    emit CharacterNFTMinted(msg.sender, newItemId, _chIdx);
   }
 
   function tokenURI(uint256 _tokenId) public view override returns (string memory) {
@@ -131,6 +140,9 @@ contract MyEpicGame is ERC721 {
     string memory strHp = Strings.toString(charAttributes.hp);
     string memory strMaxHp = Strings.toString(charAttributes.maxHp);
     string memory strAttackDamage = Strings.toString(charAttributes.attackDamage);
+    string memory healAmount = Strings.toString(charAttributes.healAmount);
+    string memory criticalChance = Strings.toString(charAttributes.criticalChance);
+
 
     string memory json = Base64.encode(
       bytes(
@@ -143,7 +155,7 @@ contract MyEpicGame is ERC721 {
             '", "description": "This is an NFT that lets people play in the game Metaverse Slayer!", "image": "',
             charAttributes.imageURI,
             '", "attributes": [ { "trait_type": "Health Points", "value": ',strHp,', "max_value":',strMaxHp,'}, { "trait_type": "Attack Damage", "value": ',
-            strAttackDamage,'} ]}'
+            strAttackDamage,'}, { "trait_type": "Heal Amount", "value": ',healAmount,'}, { "trait_type": "Critical chance", "value": ',criticalChance,'} ]}'
           )
         )
       )
@@ -157,26 +169,30 @@ contract MyEpicGame is ERC721 {
   }
 
   function attackBoss() public {
-    // Get the state of the player's NFT.
     uint256 nftTokenIdOfPlayer = nftHolders[msg.sender];
     CharacterAttributes storage player = nftHolderAttributes[nftTokenIdOfPlayer];
-    console.log("\nPlayer w/ character %s about to attack. Has %s HP and %s AD", player.name, player.hp, player.attackDamage);
     console.log("Boss %s has %s HP and %s AD", bigBoss.name, bigBoss.hp, bigBoss.attackDamage);
     require (
       player.hp > 0,
       "Error: character must have HP to attack boss."
     );
 
-    // Make sure the boss has more than 0 HP.
     require (
       bigBoss.hp > 0,
       "Error: boss must have HP to attack boss."
     );
 
-    if (bigBoss.hp < player.attackDamage) {
+    uint multiplier = 1;
+    bool isCritical = rand() < player.criticalChance;
+
+    if (isCritical) {
+      multiplier = 2;
+    }
+
+    if (bigBoss.hp < player.attackDamage * multiplier) {
       bigBoss.hp = 0;
     } else {
-      bigBoss.hp = bigBoss.hp - player.attackDamage;
+      bigBoss.hp = bigBoss.hp - player.attackDamage * multiplier;
     }
 
     console.log("Player attacked boss. New boss hp %s", bigBoss.hp);
@@ -188,31 +204,53 @@ contract MyEpicGame is ERC721 {
       player.hp = player.hp - bigBoss.attackDamage;
     }
     
-    // Console for ease.
-    console.log("Boss attacked player. New player hp: %s\n", player.hp);
-    
-    emit AttackComplete(bigBoss.hp, player.hp);
+    emit AttackComplete(bigBoss.hp, player.hp, player.characterIndex, isCritical);
   }
 
-  function checkIfUserHasNFT() public view returns (CharacterAttributes memory) {
-    // Get the tokenId of the user's character NFT
+  function heal() public {
+    uint256 nftTokenIdOfPlayer = nftHolders[msg.sender];
+    CharacterAttributes storage player = nftHolderAttributes[nftTokenIdOfPlayer];
+    require(player.hp < player.maxHp, 'Your hp is full');
+    if (player.hp + player.healAmount > player.maxHp) {
+      player.hp = player.maxHp;
+    } else {
+      player.hp += player.healAmount;
+    }
+
+    emit AttackComplete(bigBoss.hp, player.hp, player.characterIndex, false);
+  }
+
+  function getCharacterNFT() public view returns (CharacterAttributes memory) {
     uint256 userNftTokenId = nftHolders[msg.sender];
-    // If the user has a tokenId in the map, return thier character.
     if (userNftTokenId > 0) {
       return nftHolderAttributes[userNftTokenId];
     }
-    // Else, return an empty character.
     else {
       CharacterAttributes memory emptyStruct;
       return emptyStruct;
-    }
+    }    
   }
 
-  function getAllDefaultCharacters() public view returns (CharacterAttributes[] memory) {
-    return defaultCharacters;
+  function getAllDefaultChars() public view returns (CharacterAttributes[] memory) {
+    return defaultChars;
   }
 
   function getBigBoss() public view returns (BigBoss memory) {
     return bigBoss;
+  }
+
+  function getAllCharacters() public view returns (CharacterAttributes[] memory) {
+    uint256 current = _tokenIds.current();
+    CharacterAttributes[] memory characters = new CharacterAttributes[](current);
+
+    for (uint256 i = 1; i <= current; i++) {
+      characters[i - 1] = nftHolderAttributes[i];
+    }
+
+    return characters;
+  }
+
+  function rand() internal view returns(uint) {
+    return uint(keccak256(abi.encodePacked(block.timestamp, msg.sender))) % 100;
   }
 }
