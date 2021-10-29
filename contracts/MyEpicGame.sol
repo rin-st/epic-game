@@ -73,7 +73,7 @@ contract MyEpicGame is ERC721 {
     uint bossHp,
     uint bossAttackDamage
   )
-    ERC721("Companies", "Company")
+    ERC721("Teenage Mutant Ninja Turtles", "TMNT")
   {
     bigBoss = BigBoss({
       name: bossName,
